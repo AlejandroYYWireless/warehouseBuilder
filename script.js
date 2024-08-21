@@ -20,7 +20,7 @@ let modalPreviewCtx = null;
 
 // Helper functions
 const worker = new Worker(URL.createObjectURL(new Blob([`
-  ${manhattanDistance.toString()}
+  ${euclideanDistance.toString()}
   ${getNeighbors.toString()}
   ${aStar.toString()}
   ${reconstructPath.toString()}
@@ -31,10 +31,13 @@ const worker = new Worker(URL.createObjectURL(new Blob([`
     postMessage(path);
   }
 `], {type: 'text/javascript'})));
+
 function manhattanDistance(a, b) {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
-
+function euclideanDistance(a, b) {
+  return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
+}
 // Functions
 function initializeModal() {
   modal = document.createElement("div");
@@ -828,10 +831,14 @@ function createGrid(width, height, rectangles) {
 function getNeighbors(node, grid) {
   const neighbors = [];
   const directions = [
-    { dx: 0, dy: -1 },
-    { dx: 1, dy: 0 },
-    { dx: 0, dy: 1 },
-    { dx: -1, dy: 0 },
+    { dx: 0, dy: -1 },  // Up
+    { dx: 1, dy: -1 },  // Up-Right
+    { dx: 1, dy: 0 },   // Right
+    { dx: 1, dy: 1 },   // Down-Right
+    { dx: 0, dy: 1 },   // Down
+    { dx: -1, dy: 1 },  // Down-Left
+    { dx: -1, dy: 0 },  // Left
+    { dx: -1, dy: -1 }, // Up-Left
   ];
 
   for (const dir of directions) {
@@ -845,7 +852,15 @@ function getNeighbors(node, grid) {
       newY < grid.length &&
       grid[newY][newX] === 0
     ) {
-      neighbors.push({ x: newX, y: newY });
+      // Check if moving diagonally
+      if (dir.dx !== 0 && dir.dy !== 0) {
+        // Ensure both adjacent cells are free for diagonal movement
+        if (grid[node.y][newX] === 0 && grid[newY][node.x] === 0) {
+          neighbors.push({ x: newX, y: newY });
+        }
+      } else {
+        neighbors.push({ x: newX, y: newY });
+      }
     }
   }
 
@@ -859,7 +874,7 @@ function aStar(start, goal, grid) {
   const fScore = new Map();
 
   gScore.set(`${start.x},${start.y}`, 0);
-  fScore.set(`${start.x},${start.y}`, manhattanDistance(start, goal));
+  fScore.set(`${start.x},${start.y}`, euclideanDistance(start, goal));
 
   while (openSet.length > 0) {
     let current = openSet.reduce((a, b) =>
@@ -874,7 +889,8 @@ function aStar(start, goal, grid) {
 
     for (const neighbor of getNeighbors(current, grid)) {
       const tentativeGScore =
-        gScore.get(`${current.x},${current.y}`) + 1;
+        gScore.get(`${current.x},${current.y}`) + 
+        euclideanDistance(current, neighbor);
 
       if (
         !gScore.has(`${neighbor.x},${neighbor.y}`) ||
@@ -884,7 +900,7 @@ function aStar(start, goal, grid) {
         gScore.set(`${neighbor.x},${neighbor.y}`, tentativeGScore);
         fScore.set(
           `${neighbor.x},${neighbor.y}`,
-          tentativeGScore + manhattanDistance(neighbor, goal)
+          tentativeGScore + euclideanDistance(neighbor, goal)
         );
 
         if (!openSet.some((node) => node.x === neighbor.x && node.y === neighbor.y)) {
