@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Warehouse Mapping Tool</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Warehouse Mapping Tool</h1>
+      <div id="warehouseContainer">
+        <canvas id="warehouseCanvas"></canvas>
+      </div>
+      <div id="controls">
+        <button onclick="addSquare()">Add Square</button>
+        <button onclick="deleteSelectedSquare()">Delete Selected</button>
+        <button onclick="finalizeLayout()">Finalize Layout</button>
+        <button onclick="loadLayout()">Load Layout From JSON</button>
+        <input placeholder="find bin" id="find-bin" type="text" />
+        <button onclick="findClosestBin()">Pin point</button>
+        <!-- Implement at the End -->
+         <input id="start-bin" placeholder="from bin" type="text">
+         <button id="draw-bin" onclick="drawPath()">Draw Path</button>
+      </div>
+    </div>
+    <script src="script.js"></script>
+  </body>
+</html>
