@@ -1,3 +1,5 @@
+const binsOnLoad = ['7-GG', '8-GG', '317-WD', '6-GG', '26-GG', '1972-SM', '11-GG', '33-GG', '320-WD', '318-WD', '2039-SM', '24-PB', '5-GG', '31-GG', '183-GG', '14-PB', '32-GG', '42-GG', '55-GG', '12-GG']
+
 const canvas = document.getElementById("warehouseCanvas");
 const ctx = canvas.getContext("2d");
 
@@ -8,13 +10,27 @@ let isDragging = false;
 let startX, startY;
 let hoverCorner = null;
 const DRAG_HANDLE_SIZE = 20;
+let shortestPath = null;
+let shortestPathLength = Infinity;
+let currentBinIndex = 0;
 // Add new global variables for modal
 let modal = null;
 let modalPreviewCanvas = null;
 let modalPreviewCtx = null;
 
 // Helper functions
+const worker = new Worker(URL.createObjectURL(new Blob([`
+  ${manhattanDistance.toString()}
+  ${getNeighbors.toString()}
+  ${aStar.toString()}
+  ${reconstructPath.toString()}
 
+  onmessage = function(e) {
+    const { start, end, grid } = e.data;
+    const path = aStar(start, end, grid);
+    postMessage(path);
+  }
+`], {type: 'text/javascript'})));
 function manhattanDistance(a, b) {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
@@ -890,58 +906,15 @@ function reconstructPath(cameFrom, current) {
   return path;
 }
 
-function drawPath() {
-  const startBinInput = document.getElementById("start-bin").value;
-  const endBinInput = document.getElementById("find-bin").value;
-
-  const start = getClosestBinCoordinates(startBinInput);
-  const end = getClosestBinCoordinates(endBinInput);
-
-  if (!start || !end) {
-    alert("Invalid start or end bin input.");
-    return;
-  }
-
-  const currentData = generateDataStructure();
-  const grid = createGrid(canvas.width, canvas.height, currentData.rectangles);
-
-  // Find the nearest free space for start and end points
-  const startFree = findClosestFreePoint({ x: Math.floor(start.x), y: Math.floor(start.y) }, grid);
-  const endFree = findClosestFreePoint({ x: Math.floor(end.x), y: Math.floor(end.y) }, grid);
-
-  if (!startFree || !endFree) {
-    alert("Unable to find a valid path. Start or end point is blocked and no free space is available nearby.");
-    return;
-  }
-
-  const path = aStar(startFree, endFree, grid);
-
-  if (!path) {
-    alert("No valid path found between the given bins.");
-    return;
-  }
-
-  // Clear previous drawings
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawSquares(); // Redraw the existing squares
-
-  // Draw the path
+function drawPath(path, color) {
   ctx.beginPath();
-  ctx.moveTo(startFree.x, startFree.y);
+  ctx.moveTo(path[0].x, path[0].y);
   path.forEach((point) => {
     ctx.lineTo(point.x, point.y);
   });
-  ctx.strokeStyle = "blue";
+  ctx.strokeStyle = color;
   ctx.lineWidth = 2;
   ctx.stroke();
-
-  // Draw start and end points
-  drawPoint(start.x, start.y, "green");
-  drawPoint(end.x, end.y, "red");
-  
-  // Draw the free start and end points
-  drawPoint(startFree.x, startFree.y, "lime");
-  drawPoint(endFree.x, endFree.y, "orange");
 }
 function findNearestFreeSpace(point, grid) {
   const maxDistance = 10; // Maximum search distance
@@ -1011,6 +984,90 @@ function drawPoint(x, y, color) {
   ctx.closePath();
 }
 
+function mapRoutes() {
+  const startBinInput = document.getElementById("start-bin").value;
+  const start = getClosestBinCoordinates(startBinInput);
+
+  if (!start) {
+    alert("Invalid start bin input.");
+    return;
+  }
+
+  const currentData = generateDataStructure();
+  const grid = createGrid(canvas.width, canvas.height, currentData.rectangles);
+
+  // Find the nearest free space for start point
+  const startFree = findClosestFreePoint({ x: Math.floor(start.x), y: Math.floor(start.y) }, grid);
+
+  if (!startFree) {
+    alert("Unable to find a valid starting point. Start point is blocked and no free space is available nearby.");
+    return;
+  }
+
+  // Clear previous drawings
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawSquares(); // Redraw the existing squares
+
+  // Draw start point
+  drawPoint(start.x, start.y, "blue");
+
+  // Reset global variables
+  shortestPath = null;
+  shortestPathLength = Infinity;
+  currentBinIndex = 0;
+
+  // Start the incremental path calculation
+  calculateNextPath(startFree, grid);
+}
+
+function calculateNextPath(startFree, grid) {
+  if (currentBinIndex >= binsOnLoad.length) {
+    // All paths have been calculated
+    if (shortestPath) {
+      drawPath(shortestPath, "green");
+    }
+    return;
+  }
+
+  const binInput = binsOnLoad[currentBinIndex];
+  const end = getClosestBinCoordinates(binInput);
+
+  if (end) {
+    const endFree = findClosestFreePoint({ x: Math.floor(end.x), y: Math.floor(end.y) }, grid);
+    if (endFree) {
+      worker.postMessage({ start: startFree, end: endFree, grid });
+      worker.onmessage = function(e) {
+        const path = e.data;
+        if (path) {
+          // Draw the path in light gray
+          drawPath(path, "rgba(200, 200, 200, 0.5)");
+
+          // Check if this is the shortest path
+          if (path.length < shortestPathLength) {
+            shortestPath = path;
+            shortestPathLength = path.length;
+          }
+
+          // Draw end point
+          drawPoint(end.x, end.y, `hsl(${(currentBinIndex * 360) / binsOnLoad.length}, 100%, 50%)`);
+        }
+
+        // Move to the next bin
+        currentBinIndex++;
+        // Schedule the next path calculation
+        setTimeout(() => calculateNextPath(startFree, grid), 0);
+      };
+    } else {
+      // If endFree is not found, move to the next bin
+      currentBinIndex++;
+      setTimeout(() => calculateNextPath(startFree, grid), 0);
+    }
+  } else {
+    // If end is not found, move to the next bin
+    currentBinIndex++;
+    setTimeout(() => calculateNextPath(startFree, grid), 0);
+  }
+}
 
 // Global assignments
 window.addEventListener("resize", resizeCanvas);
@@ -1024,6 +1081,8 @@ window.finalizeLayout = finalizeLayout;
 window.deleteSelectedSquare = deleteSelectedSquare;
 window.loadLayout = loadLayout;
 window.findClosestBin = findClosestBin;
+window.mapRoutes = mapRoutes;
+
 
 canvas.addEventListener("mousedown", handleMouseDown);
 canvas.addEventListener("mousemove", handleMouseMove);
