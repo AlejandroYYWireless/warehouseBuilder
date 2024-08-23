@@ -32,9 +32,7 @@ const worker = new Worker(URL.createObjectURL(new Blob([`
   }
 `], {type: 'text/javascript'})));
 
-function manhattanDistance(a, b) {
-  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-}
+
 function euclideanDistance(a, b) {
   return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
 }
@@ -988,7 +986,6 @@ function findClosestFreePoint(point, grid) {
 
   return null; // No free space found within the entire grid
 }
-
 function drawPoint(x, y, color) {
   ctx.beginPath();
   ctx.arc(x, y, 5, 0, 2 * Math.PI);
@@ -999,7 +996,6 @@ function drawPoint(x, y, color) {
   ctx.stroke();
   ctx.closePath();
 }
-
 function mapRoutes() {
   const startBinInput = document.getElementById("start-bin").value;
   const start = getClosestBinCoordinates(startBinInput);
@@ -1035,7 +1031,6 @@ function mapRoutes() {
   // Start the incremental path calculation
   calculateNextPath(startFree, grid);
 }
-
 function calculateNextPath(startFree, grid) {
   if (currentBinIndex >= binsOnLoad.length) {
     // All paths have been calculated
